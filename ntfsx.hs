@@ -1,28 +1,11 @@
 -- ntfsx.hs:
 --
--- This is a simple implementation of a tool to copy out the SAM and
--- SYSTEM registry hives.  It relies on my NTFS parsing library, and
--- will search through the MFT for the two relevant files and export
--- them (if possible) to new files in the current directory.
---
--- The use case for this tool is in post-exploitation, after gaining
--- admin rights, in order to obtain the local password hashes from a
--- system.  I often find that having several techniques available is
--- beneficial, as some situations render other tools or techniques
--- useless.
---
--- This tool requires *administrator* rights.  Some techniques require
--- NT AUTHORITY\SYSTEM rights, which makes this potentially more
--- useful if those rights are not attainable.
---
--- SAMex does not do anything particularly dangerous (to my
--- knowledge), such as DLL injection.  It also does not rely on a
--- system configuration in terms of local services (e.g., the Volume
--- Shadow Copy service).  As such, this is a very unintrusive
--- technique for extracting the SAM and SYSTEM hives.
---
--- It is assumed that the user will be able to post-process the
--- registry hives as appropriate (I recommend bkhive and samdump2).
+-- This is a simple tool that extracts files from an NTFS filesystem on a running system
+-- without requiring SYSTEM rights or permissions to access the files in question.  This
+-- turns out to be most useful for copying files that are locked by the operating system.
+-- This functionality relies on the ability for an administrator account to open a read-
+-- only file handle for a storage volume itself, and then to parse NTFS to identify the
+-- sectors on the volume that house the desired data.
 --
 -- Author:  Josh Stone
 -- Contact: yakovdk@gmail.com
