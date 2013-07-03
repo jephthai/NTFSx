@@ -141,7 +141,8 @@ usage = do
 banner = do
   putStrLn "-----------------------------------------------------------------"
   putStrLn "        NTFSx - www.josho.org - (C) June 2012 Josh Stone"
-  putStrLn "  (This software comes with NO WARRANTY; your mileage may vary)"
+  putStrLn "         NTFSx comes with ABSOLUTELY NO WARRANTY; it is  "
+  putStrLn "     licensed under the GNU Public License (GPL), version 2"
   putStrLn "-----------------------------------------------------------------"
   putStrLn ""
 
