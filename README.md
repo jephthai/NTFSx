@@ -77,12 +77,12 @@ To extract the NTDS password databases from a running system, the
 following command should generally work.  It may take several minutes,
 depending on the size of the master file table (MFT).
 
-  C:\>ntfsx ntds
+    C:\>ntfsx ntds
 
 You can also extract a file by specifying the path.  The second
 argument specifies the filename to write with the contents:
 
-  C:\>ntfsx Windows\system32\config\SYSTEM SYSTEM.OUT
+    C:\>ntfsx Windows\system32\config\SYSTEM SYSTEM.OUT
 
 4 Implementation 
 ----------------
