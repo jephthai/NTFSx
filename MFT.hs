@@ -6,7 +6,7 @@
 -- library.
 --
 -- Author:  Josh Stone
--- Contact: yakovdk@gmail.com
+-- Contact: josh@josho.org
 -- Created: 2009
 --
 --
@@ -33,20 +33,18 @@ import qualified Data.ByteString as BS
 getMFT :: HANDLE -> Integer -> Integer -> IO (Maybe MFTEntry)
 getMFT h base id = do
   WB.setFilePointer h (id * 2 + base)
-  entry <- readMFTEntry h
-  return entry
+  readMFTEntry h
 
 getMFTraw h offset = do
   WB.setFilePointer h offset
-  entry <- readMFTEntry h
-  return entry
+  readMFTEntry h
 
 getMFTSectors e = aSectors d
   where attrs = mftAttrs e
         datas = filter isData attrs
         isData (DataAttr _ _) = True
         isData _              = False
-        d = datas !! 0
+        d = head datas
 
 getDataBlock :: MFTEntry -> [Block]
 getDataBlock e = map aBlock datas
@@ -61,34 +59,34 @@ getDataBlock e = map aBlock datas
 -- being listed first.  See the next function for an improvement.
 --
 getMFTName :: MFTEntry -> (Integer, String)
-getMFTName e = fromMaybe ((-1), "\\null/") findname
-  where isname (NameAttr _ _ _) = True
-        isname _                = False
+getMFTName e = fromMaybe (-1, "\\null/") findname
+  where isname NameAttr{} = True
+        isname _          = False
         names = filter isname $ mftAttrs e
         findname = case names of
           [] -> Nothing
-          ((NameAttr _ p f):_) -> Just (toInteger p,f)
+          (NameAttr _ p f : _) -> Just (toInteger p,f)
 
 --
 -- MFT entries can have multiple $FILENAME attributes, so this
 -- function returns them all in a list.
 --
 getMFTNames :: MFTEntry -> [(Integer, String)]
-getMFTNames e = fromMaybe [((-1), "\\null/")] findname
-  where isname (NameAttr _ _ _) = True
-        isname _                = False
+getMFTNames e = fromMaybe [(-1, "\\null/")] findname
+  where isname NameAttr{} = True
+        isname _          = False
         names = filter isname $ mftAttrs e
         findname = case names of
           [] -> Nothing
           ns -> Just (map (\(NameAttr _ p f) -> (toInteger p, f)) ns)
 
 getParent [] = Nothing
-getParent ((NameAttr _ p _):as) = Just p
+getParent (NameAttr _ p _ : as) = Just p
 getParent (_:as) = getParent as
 
-coolAttrs (NameAttr _ _ _) = True
-coolAttrs (DataAttr _ _) = True
-coolAttrs _                = False
+coolAttrs NameAttr{} = True
+coolAttrs DataAttr{} = True
+coolAttrs _          = False
   
 mftFlags :: MFTEntry -> Maybe Int
 mftFlags e = do
@@ -131,9 +129,7 @@ readMFTEntry h = do
       blockOK    = blockStarts block [0x46,0x49,0x4c,0x45]
       hdrOK      = isJust hdr
       entry      = MFTEntry (fromJust hdr) attrs
-  if blockOK && hdrOK
-    then return $ Just entry
-    else return Nothing
+  return (if blockOK && hdrOK then Just entry else Nothing)
 
 -- 
 -- An attribute represents something about the object represented by
@@ -168,12 +164,12 @@ data Attribute =
     
 attrName a =
     case a of
-        NameAttr _ p _ -> "NameAttr:" ++ (show p)
+        NameAttr _ p _ -> "NameAttr:" ++ show p
         WeirdAttr _ _ -> "WeirdAttr"
         NullAttr -> "NullAttr"
-        ParentAttr n -> "ParentAttr:" ++ (show n)
-        StandardAttr _ _ _ _ _ _ _ _ _ _ _ _ _ -> "StandardAttr"
-        DataAttr _ b -> "DataAttr " ++ (show $ (length b))
+        ParentAttr n -> "ParentAttr:" ++ show n
+        StandardAttr{} -> "StandardAttr"
+        DataAttr _ b -> "DataAttr " ++ (show (length b))
     
 readAttributes :: Block -> [Attribute]
 readAttributes b = if lastAttr then [] else attr : rest
@@ -250,25 +246,25 @@ parseData b = if nonresident == 1 then parseNonresidentData b else []
 
 expandRuns [] = []
 expandRuns (r:[]) = [r]
-expandRuns (r:rs) = r : (expandRuns' (r:rs))
+expandRuns (r:rs) = r : expandRuns' (r:rs)
                     
 expandRuns' [] = []
 expandRuns' (r:[]) = [r]
 expandRuns' ((offset1, count1):(offset2, count2):rs) = current : tail 
   where current = (offset1 + offset2, count2)
         remainder = expandRuns' (current : rs)
-        tail = if (remainder == [current]) then [] else remainder
+        tail = if remainder == [current] then [] else remainder
 
 parseNonresidentData b = expanded
   where runlist  = dropBlock b (64 + offset )
         offset   = getWord b 36
         size     = getLong b 40
-        expanded = (expandRuns (parseRuns parseRun' runlist))
-        output   = "Filesize: " ++ (show size) ++ " bytes"
+        expanded = expandRuns (parseRuns parseRun' runlist)
+        output   = "Filesize: " ++ show size ++ " bytes"
 
 parseRuns _ b | blockLen b < 4 = []
-parseRuns _ b | (getByte b 0) == 0x00 = []
-parseRuns f b = run1 : (parseRuns parseRun remainder)
+parseRuns _ b | getByte b 0 == 0x00 = []
+parseRuns f b = run1 : parseRuns parseRun remainder
   where (run1, size) = f b
         remainder    = dropBlock b size
 
@@ -278,7 +274,7 @@ parseRun b = ((toInteger (start * 8), toInteger (len * 8)), 1 + offLen + lenLen)
         offLen = fromIntegral (highNybble (toInteger lenspec))
         lenOff = 1
         offOff = lenOff + lenLen
-        len = getLittleEndianInt' lenLen b lenOff
+        len = getLittleEndianInt lenLen b lenOff
         start = fixSign (getSeq b offOff offLen)
 
 parseRun' b = ((toInteger (start * 8), toInteger (len * 8)), 1 + offLen + lenLen)
@@ -287,16 +283,16 @@ parseRun' b = ((toInteger (start * 8), toInteger (len * 8)), 1 + offLen + lenLen
         offLen = fromIntegral (highNybble (toInteger lenspec))
         lenOff = 1
         offOff = lenOff + lenLen
-        start = getLittleEndianInt' offLen b offOff
-        len = getLittleEndianInt' lenLen b lenOff
+        start = getLittleEndianInt offLen b offOff
+        len = getLittleEndianInt lenLen b lenOff
 
 fixSign :: [Word8] -> Integer
-fixSign b = if neg then (i * (-1) - 1) else i -- + 1
-  where neg = ((reverse b) !! 0) .&. 0x80 > 0
+fixSign b = if neg then i * (-1) - 1 else i -- + 1
+  where neg = last b .&. 0x80 > 0
         b' = if neg
-             then (map (toInteger.complement) b)
-             else (map toInteger b)
-        pump x y = x .|. (shiftL y 8)
+             then map (toInteger.complement) b
+             else map toInteger b
+        pump x y = x .|. shiftL y 8
         i = foldr pump 0 b'
 
 lowNybble x = x .&. 0xf
@@ -308,7 +304,7 @@ parseParent :: Block -> AttrHeader -> Integer
 parseParent b hdr = toInteger $ getLong b 24
 
 parseName :: Block -> AttrHeader -> String
-parseName b hdr = (getUnicode nb 66 ((getByte nb 64) * 2))
+parseName b hdr = getUnicode nb 66 ((getByte nb 64) * 2)
     where nb = dropBlock b (getInt b 20)
 
 --
@@ -430,7 +426,7 @@ pAttr _   = UnknownAttr
 --
 
 doFixups :: Block -> (Int, Int) -> Block
-doFixups b (off, len) = (setBytes b patches)
+doFixups b (off, len) = setBytes b patches
     where bs = map (\x -> getSeq b (x * 2 + off) 2) [0..len - 1]
           patches = zip (map (\x -> x * 512 - 2) [1..]) (tail bs)
 

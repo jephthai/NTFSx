@@ -1,6 +1,6 @@
 --
 -- Author:  Josh Stone
--- Contact: yakovdk@gmail.com
+-- Contact: joshs@tracesecurity.com
 -- Created: 2012
 --
 
@@ -50,9 +50,7 @@ setFilePointer h offset = do
 --
         
 readByte :: Ptr Word8 -> Int -> IO Word8
-readByte mem addr = do
-    val <- peek offset
-    return val
+readByte mem addr = peek offset
   where offset = mem `plusPtr` addr
   
 -- 
@@ -78,8 +76,7 @@ readBlock h = do
 openDrive :: Char -> IO HANDLE
 openDrive letter = do
     let path = "\\\\.\\" ++ [letter, ':']
-    h <- createFile path gENERIC_READ 3 Nothing oPEN_EXISTING fILE_ATTRIBUTE_NORMAL Nothing
-    return h
+    createFile path gENERIC_READ 3 Nothing oPEN_EXISTING fILE_ATTRIBUTE_NORMAL Nothing
 
 toASCII c | c < 0x20 = '.'
 toASCII c | c > 0x7e = '.'

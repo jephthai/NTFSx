@@ -6,7 +6,7 @@
 --
 --
 -- Author:  Josh Stone
--- Contact: yakovdk@gmail.com
+-- Contact: joshs@tracesecurity.com
 -- Created: 2012
 --
 
@@ -55,10 +55,7 @@ setFilePointer h offset = do
 --
 
 secReadByte :: Ptr Word8 -> Int -> IO Word8
-secReadByte mem addr = do
-    val <- peek offset
-    return val
-
+secReadByte mem addr = peek offset
   where offset = mem `plusPtr` addr
 
 --
@@ -85,8 +82,7 @@ exportRuns h outfile runs = do
   out <- createFile outfile gENERIC_WRITE 3 Nothing cREATE_ALWAYS fILE_ATTRIBUTE_NORMAL Nothing
   forM_ runs $ \(offset, count) -> do
     setFilePointer h offset
-    forM [1..count] $ \_ -> do
-      readWriteBlock h out
+    forM [1..count] $ \_ -> readWriteBlock h out
   return ()
   
 exportSectors h outfile start count = do

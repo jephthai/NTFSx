@@ -4,30 +4,28 @@
 -- metadata for an NTFS filesystem.
 --
 -- Author:  Josh Stone
--- Contact: yakovdk@gmail.com
+-- Contact: josh@josho.org
 -- Created: 2009
 --
 --
 
 module NTFS where
 
-import System.Win32.File
-import System.Win32.Types
-import System.IO.Unsafe
-import System.IO
 import Blocker
-import Text.Printf
-import TypeSyms
+import BootSector
+import Control.Monad
+import Data.Char
+import Data.List
+import Data.Maybe
 import Debug.Trace
 import MFT
-import BootSector
-import Blocker
+import System.IO
+import System.IO.Unsafe
+import System.Win32.File
+import System.Win32.Types
+import Text.Printf
+import TypeSyms
 import WinBlocks
-import Control.Monad
-import Data.Maybe
-import Data.List
-import Data.Char
-import Control.Monad
 
 type MFTHandle = HANDLE
 
@@ -57,9 +55,9 @@ data NTFSFile = NTFSFile {
 
 instance Show NTFSFile where
      show h = "::NTFSFile::\n" ++
-              "MFT#:     " ++ (show (nfID h)) ++ "\n" ++
-              "Parent:   " ++ (show (nfParent h)) ++ "\n" ++
-              "Filename: " ++ (nfName h) ++ "\n" ++
+              "MFT#:     " ++ show (nfID h) ++ "\n" ++
+              "Parent:   " ++ show (nfParent h) ++ "\n" ++
+              "Filename: " ++ nfName h ++ "\n" ++
               "Sectors:  " ++ secstr ++
               "\n"
         where secstr = foldl1 ((++).(++ "\n          ")) (map show (nfSectors h))
@@ -72,7 +70,7 @@ calcMFT n = do
   (Just mft) <- getFile n 0
   return (MFTFrag $ nfSectors mft)
 
-calcMFTraw n id = calcMFTraw' runs id 
+calcMFTraw n = calcMFTraw' runs 
   where (MFTFrag runs) = ntMFrag n
 
 calcMFTraw' [] _ = 0
@@ -98,9 +96,8 @@ ntfsRoot = 5
 multiHunt n path = do
   (Just root) <- getFile n 5
   let path' = map (map toLower) path
-  putStrLn (show path')
-  result <- multiHunt' n ("\\" : path') ([root] : (take (length path) (repeat []))) 0 0
-  return result
+  print path'
+  multiHunt' n ("\\" : path') ([root] : replicate (length path) []) 0 0 
 
 multiHunt' n path hist id hits = do
   mft <- getFile n id
@@ -122,11 +119,11 @@ multiHunt' n path hist id hits = do
             hist' = pushHist hist (fromMaybe undefined (elemIndex name path)) file
     _ -> multiHunt' n path hist (id+1) hits
 
-mhStatus x = putStrLn $ ("Found "++x)
+mhStatus x = putStrLn ("Found "++x)
 
 pushHist [] _ _ = []
 pushHist (x:xs) 0 mft = (mft : x) : xs
-pushHist (x:xs) n mft = x : (pushHist xs (n-1) mft)
+pushHist (x:xs) n mft = x : pushHist xs (n-1) mft
 
 pathDone [] = Nothing
 pathDone (x:[]) = Just x
@@ -134,11 +131,11 @@ pathDone (x:[]:_) = Nothing
 pathDone (x:y:path) | x `follows` y = pathDone ([selectChild x y]:path)
 pathDone _ = Nothing
 
-follows xs ys = length res > 0
-  where res = catMaybes (map (\x -> find (\v -> (nfParent v) == (nfID x)) ys) xs)
+follows xs ys = not (null res) -- length res > 0
+  where res = mapMaybe (\x -> find (\v -> nfParent v == nfID x) ys) xs
 
-selectChild xs ys = res !! 0
-  where res = catMaybes (map (\x -> find (\v -> (nfParent v) == (nfID x)) ys) xs)
+selectChild xs ys = head res
+  where res = mapMaybe (\x -> find (\v -> nfParent v == nfID x) ys) xs
 
 
 --
@@ -156,7 +153,7 @@ huntMFT' n parent fname id = do
   mft <- getFile n id 
   case mft of
     Just file -> if ischild && isfile then return (Just file) else huntMFT' n parent fname (id + 1)
-      where ischild = (nfParent file) == parent
+      where ischild = nfParent file == parent
             fname'  = map toLower fname
             mname   = map toLower (nfName file)
             isfile  = fname' == mname
@@ -192,7 +189,6 @@ readNTFS path = do
 
 getFile :: NTFS -> MFTID -> IO (Maybe NTFSFile)
 getFile ntfs id = do
-  -- entry <- getMFT (ntHandle ntfs) (ntMFTOff ntfs) id
   let (MFTFrag frags) = (ntMFrag ntfs)
       mftraw = calcMFTraw ntfs id
   entry <- case frags of
@@ -203,7 +199,7 @@ getFile ntfs id = do
     Nothing -> return Nothing
     Just e  -> do
       let names   = getMFTNames e
-          (fparent, fname) = head $ reverse names
+          (fparent, fname) = last names 
           sectors          = getMFTSectors e
           fileobj = NTFSFile id fname fparent sectors
       return (Just fileobj)
@@ -223,7 +219,7 @@ getParentFile ntfs (NTFSFile _ _ p _) = do
 
 findFileByPath ntfs r [] = Just r
 findFileByPath ntfs r (f:fs) =
-  case (findFileChild ntfs r f) of
+  case findFileChild ntfs r f of
     Just r' -> findFileByPath ntfs r' fs
     Nothing -> Nothing
 

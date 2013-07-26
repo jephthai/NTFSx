@@ -7,7 +7,7 @@
 -- representations.
 --
 -- Author:  Josh Stone
--- Contact: yakovdk@gmail.com
+-- Contact: josh@josho.org
 -- Created: 2009
 --
 --
@@ -29,10 +29,10 @@ data Block = Block {
     } deriving (Eq)
 
 instance Show Block where
-    show b = "<BLOCK " ++ (show $ blockLen b) ++ ">"
+    show b = "<BLOCK " ++ show (blockLen b) ++ ">"
 
     
-openBlockFile drive = WB.openDrive drive
+openBlockFile = WB.openDrive 
 
 -- Return a lazy list of blocks read from the provided binary file
 -- handle.  Being lazy, it really helps keep the memory usage down
@@ -55,8 +55,7 @@ openBlockFile drive = WB.openDrive drive
 readBlock :: HANDLE -> Integer -> IO Block
 readBlock h a = do
   WB.setFilePointer h a -- hSeek h AbsoluteSeek (a * 512)
-  b <- readBlockRel h 
-  return b
+  readBlockRel h
 
 readBlockRel :: HANDLE -> IO Block
 readBlockRel h = do
@@ -96,20 +95,15 @@ concatBlock a b = Block (BS.concat [a', b'])
 getLittleEndianInt :: Int -> Block -> Int -> Int
 getLittleEndianInt len b off = foldr pump 0 vals
     where bs = BS.drop off (rbData b)
-          vals = map (fromIntegral) (BS.unpack (BS.take len bs))
-          pump x y = x .|. (shiftL y 8)
+          vals = map fromIntegral (BS.unpack (BS.take len bs))
+          pump x y = x .|. shiftL y 8
 
-getLittleEndianInt' :: Int -> Block -> Int -> Int
-getLittleEndianInt' len b off = foldr pump 0 vals
-    where bs = BS.drop off (rbData b)
-          vals = map (fromIntegral) (BS.unpack (BS.take len bs))
-          pump x y = x .|. (shiftL y 8)
 
 getLittleEndianInteger :: Int -> Block -> Int -> Integer
 getLittleEndianInteger len b off = foldr pump 0 vals
     where bs = BS.drop off (rbData b)
-          vals = map (toInteger) (BS.unpack (BS.take len bs))
-          pump x y = x .|. (shiftL y 8)
+          vals = map toInteger (BS.unpack (BS.take len bs))
+          pump x y = x .|. shiftL y 8
 
 getByte = getLittleEndianInt 1
 getInt  = getLittleEndianInt 2
@@ -130,7 +124,7 @@ takeBlock :: Block -> Int -> Block
 takeBlock b n = b { rbData = BS.take n (rbData b) }
 
 blockStarts :: Block -> [Word8] -> Bool
-blockStarts b p = BS.isPrefixOf (BS.pack p) (rbData b)
+blockStarts b p = BS.pack p `BS.isPrefixOf` rbData b
 
 blockLen :: Block -> Int
 blockLen b = BS.length (rbData b)
@@ -146,15 +140,15 @@ getUnicode b off len = map (chr.fromIntegral) (filter (>0) seq)
 putBlockHex n b = printArray n (BS.unpack $ rbData b)
 
 printArray :: Int -> [Word8] -> IO ()
-printArray _ [] = do return ()
+printArray _ [] = return ()
 printArray n a = do
   let chunk = take 16 a
   printf "%08x  " n
-  mapM (printf "%02x ") (take 8 chunk)
+  mapM_ (printf "%02x ") (take 8 chunk)
   printf " "
-  mapM (printf "%02x ") (drop 8 chunk)
+  mapM_ (printf "%02x ") (drop 8 chunk)
   printf " |"
-  mapM (printf "%c" . ntc) chunk
+  mapM_ (printf "%c" . ntc) chunk
   putStrLn "|"
   printArray (n + 16) (drop 16 a)
   

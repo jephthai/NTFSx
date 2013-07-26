@@ -56,7 +56,7 @@ main = do
     putStrLn ""
     putStrLn "MFT Fragments:"
     putStrLn ""
-    putStrLn (show fs)
+    print fs
     putStrLn ""
   case args of
     ("sam":[])  -> doSAM n
@@ -83,7 +83,7 @@ split d = unfoldr iterate
 
 doPath n path out = do
   n <- readNTFS 'C'
-  putStrLn $ "NOTE: this file must exist, or I won't terminate"
+  putStrLn "NOTE: this file must exist, or I won't terminate"
   putStrLn ""
   dumpFile n path out
 
@@ -100,13 +100,13 @@ extractFile n id fname = do
   (Just mft) <- getMFTraw (ntHandle n) raw
   let hdr = mftHeader mft
   putStrLn ""
-  putStrLn (show f)
+  print f
   exportRuns (ntHandle n) fname (nfSectors f)
 
-huntPath n fs = huntPath' n ntfsRoot fs
+huntPath n = huntPath' n ntfsRoot
 huntPath' n p [] = return p
 huntPath' n p (f:fs) = do
-  putStrLn ("Searching for " ++ (show f))
+  putStrLn ("Searching for " ++ show f)
   (Just mft) <- huntMFT n p f
   huntPath' n (nfID mft) fs
 
@@ -141,8 +141,7 @@ usage = do
 banner = do
   putStrLn "-----------------------------------------------------------------"
   putStrLn "        NTFSx - www.josho.org - (C) June 2012 Josh Stone"
-  putStrLn "         NTFSx comes with ABSOLUTELY NO WARRANTY; it is  "
-  putStrLn "     licensed under the GNU Public License (GPL), version 2"
+  putStrLn "  (This software comes with NO WARRANTY; your mileage may vary)"
   putStrLn "-----------------------------------------------------------------"
   putStrLn ""
 
